@@ -190,7 +190,7 @@ int main(int argc, char* argv[]) {
 
     char** child_args = malloc((argc) * sizeof(char*));
     memcpy(child_args, argv + 1, (argc - 1) * sizeof(char*));
-    child_args[argc - 1] = "\0";
+    child_args[argc - 1] = NULL;
 
     printf("before clone\n");
 
