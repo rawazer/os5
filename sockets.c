@@ -9,7 +9,7 @@
 #define MAXCLIENTS 5
 
 int establish(unsigned short portnum) {
-    char myname[MAXHOSTNAME+1];
+    char myname[MAXHOSTNAME];
     int s;
     struct sockaddr_in sa;
     struct hostent *hp;
@@ -48,7 +48,7 @@ int get_connection(int s) {
     return t;
 }
 
-int call_socket(char *hostname, unsigned short portnum) {
+int call_socket(char* hostname, unsigned short portnum) {
     struct sockaddr_in sa;
     struct hostent *hp;
     int s;
@@ -116,7 +116,8 @@ int write_data(int s, char *buf, int n) {
 
 int main (int argc, char* argv[]) {
     if (strcmp(argv[1], "client") == 0) {
-        int s = call_socket("localhost", atoi(argv[2]));
+        char localhost[] = "localhost";
+        int s = call_socket(localhost, atoi(argv[2]));
         if (write_data(s, argv[3], strlen(argv[3])) == -1) {
             fprintf(stderr, "System error: writing command failed\n");
             exit(1);

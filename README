@@ -1,0 +1,51 @@
+ariel.wein, roireit
+Ariel Weinstok (316336981), Roi Reiter (208244657)
+EX: 5
+
+FILES:
+README -- this file
+<source files>
+Makefile -- a makefile which creates the container and sockets executables from the source code
+
+REMARKS:
+None.
+
+ANSWERS:
+
+Q1:
+The Linux PID namespaces allow nesting of PIDs inside of containers, which are organized independently from the host.
+This means that the host can see the entire namespace it created, and can manipulate it from the outside, while the
+container is only aware of the processes running inside it. The container sees the processes as unique to its entire
+run, while the host is aware of the fact that these processes are bound under the same namespace.
+One general use of this fact is that the host controls all of the namespace at once, and can manipulate the whole run
+of the container "in one go". Usually, modifying behaviours of multiple processes isn't accessible in a simple way,
+for example if we wanted to suspend or resume multiple processes, we'd have to send signals to each one individually.
+But with the PID namespace, the host can suspend and resume all processes running inside the container, by suspending
+or resuming the run of the container itself, thus controlling multiple processes at once.
+
+Q2:
+The mount namespaces allow different clones to have different mounting points for new processes. This requires the
+creation of a new filesystem, which is a different section of memory from the host. The sections of memory are inaccessible
+from one another, and thus a process within a container cannot have access to files which are in a filesystem it doesn't
+know of. This isolates the contained environment from the outside host environment.
+
+Q3:
+The Linux cgroups allow manipulation of the contained processes' actions within the container. One general use of them
+is limiting the memory size which the processes take. A host can create a cgroup which allow all processes in the container
+to use, for example, up to 1 GB of memory.
+
+Q4:
+The main difference between the two commands is that on fork, the child process holds the same namespaces as the parent,
+which means they are on the same level of privilege. On clone, we can control and limit the namespaces of the child, thus
+creating an even more separated environment from the parent.
+Another difference is that the fork command creates a child process which uses the same code segment as the parent, whereas
+the clone command can be given a new function to run.
+
+Q5:
+chroot is the command for changing the root directory of a specific process, from the default "/" to any valid input path.
+
+Q6:
+The procfs is used as an interface for user-level calls to get information about processes running in the environment.
+This way, data which is usually accessible only with the help of the kernel through system calls is available without
+entering kernel mode. For example, using the "ps" command for getting information on running processes will obtain the
+data from the proc file system itself, rather than retrieving it from the operating system.

@@ -1,16 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
-#define __USE_GNU
 #include <sched.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
-#include <sys/syscall.h>
-#include <sys/time.h>
 #include <unistd.h>
-#include <errno.h>
+
+#ifndef __USE_GNU
+#define __USE_GNU
+#endif
 
 #define STACK 8192
 
@@ -40,30 +40,6 @@ static void _mkdir() {
     }
 }
 
-// static void _mkdir(const char *dir) {
-//     char tmp[256];
-//     char *p = NULL;
-//     size_t len;
-
-//     snprintf(tmp, sizeof(tmp),"%s",dir);
-//     len = strlen(tmp);
-//     if (tmp[len - 1] == '/')
-//         tmp[len - 1] = 0;
-//     for (p = tmp + 1; *p; p++)
-//         if (*p == '/') {
-//             *p = 0;
-//             if(mkdir(tmp, 0755) != 0) {
-//                 fprintf(stderr, "System error: creating cgroup failed\n");
-//                 exit(1);
-//             }
-//             *p = '/';
-//         }
-//     // if(mkdir(tmp, 0755) != 0) {
-//     //     fprintf(stderr, "System error: creating cgroup failed\n");
-//     //     exit(1);
-//     // }
-// }
-
 static void _write(char* path, char *content) {
     FILE* ptr = fopen(path, "w");
     if (ptr == NULL) {
@@ -81,18 +57,17 @@ static void _write(char* path, char *content) {
 }
 
 static void create_cgroups(char* num_processes) {
-    char* cgroups_path = "/sys/fs/cgroup/pids";
     _mkdir();
 
-    char* cgroups_procs_path = "/sys/fs/cgroup/pids/cgroup.procs";
-    char* cgroups_pid_max_path = "/sys/fs/cgroup/pids/pids.max";
-    char* notify_on_release_path = "/sys/fs/cgroup/pids/notify_on_release";
+    char cgroups_procs_path[] = "/sys/fs/cgroup/pids/cgroup.procs";
+    char cgroups_pid_max_path[] = "/sys/fs/cgroup/pids/pids.max";
+    char notify_on_release_path[] = "/sys/fs/cgroup/pids/notify_on_release";
 
     int pid = getpid();
     int size_pid = _numlen(pid);
-    char* cur_pid = malloc((size_pid + 2) * sizeof(char));
+    char* cur_pid = (char *)malloc((size_pid + 2) * sizeof(char));
     snprintf(cur_pid, size_pid + 2, "%d\n", pid);
-    char* notify = "1";
+    char notify[] = "1";
 
     _write(cgroups_procs_path, cur_pid);
     _write(cgroups_pid_max_path, num_processes);
@@ -102,35 +77,30 @@ static void create_cgroups(char* num_processes) {
 }
 
 static void remove_cgroups(char* fs) {
-    fprintf(stderr, "%s\n", fs);
-
-    char* cgroups_path = malloc((strlen(fs) + 19)*sizeof(char));
-    char* cgroups_procs_path = malloc((strlen(fs) + 32)*sizeof(char));
-    char* cgroups_pid_max_path = malloc((strlen(fs) + 28)*sizeof(char));
-    char* notify_on_release_path = malloc((strlen(fs) + 37)*sizeof(char)); 
+    char* cgroups_path = (char *)malloc((strlen(fs) + 19)*sizeof(char));
+    char* cgroups_procs_path = (char *)malloc((strlen(fs) + 32)*sizeof(char));
+    char* cgroups_pid_max_path = (char *)malloc((strlen(fs) + 28)*sizeof(char));
+    char* notify_on_release_path = (char *)malloc((strlen(fs) + 37)*sizeof(char));
+    char* cgroup_path = (char *)malloc((strlen(fs) + 14)*sizeof(char));
+    char* fs_path = (char *)malloc((strlen(fs) + 7)*sizeof(char));
 
     strcpy(cgroups_path, fs);
     strcpy(cgroups_procs_path, fs);
     strcpy(cgroups_pid_max_path, fs);
     strcpy(notify_on_release_path, fs);
+    strcpy(cgroup_path, fs);
+    strcpy(fs_path, fs);
 
     strcpy(cgroups_path + strlen(fs), "/sys/fs/cgroup/pids");
     strcpy(cgroups_procs_path + strlen(fs), "/sys/fs/cgroup/pids/cgroup.procs");
     strcpy(cgroups_pid_max_path + strlen(fs), "/sys/fs/cgroup/pids/pids.max");
     strcpy(notify_on_release_path + strlen(fs), "/sys/fs/cgroup/pids/notify_on_release");
-
-    printf("-----\n%s\n%s\n%s\n%s\n-----\n",
-            cgroups_path, cgroups_procs_path, 
-            cgroups_pid_max_path, notify_on_release_path);
-
-
-    // char* cgroups_path = strcat(fs, "/sys/fs/cgroup/pids");
-    // char* cgroups_procs_path = strcat(cgroups_path, "/cgroup.procs");
-    // char* cgroups_pid_max_path = strcat(cgroups_path, "/pids.max");
-    // char* notify_on_release_path = strcat(cgroups_path, "/notify_on_release");
+    strcpy(cgroup_path + strlen(fs), "/sys/fs/cgroup");
+    strcpy(fs_path + strlen(fs), "/sys/fs");
     
     if(remove(cgroups_procs_path) != 0 || remove(cgroups_pid_max_path) != 0 ||
-        remove(notify_on_release_path) != 0 || remove(cgroups_path) != 0) {
+        remove(notify_on_release_path) != 0 || remove(cgroups_path) != 0 ||
+        remove(cgroup_path) != 0 || remove(fs_path) != 0) {
             fprintf(stderr, "System error: deleting cgroups failed\n");
             exit(1);
     }
@@ -139,6 +109,8 @@ static void remove_cgroups(char* fs) {
     free(cgroups_procs_path);
     free(cgroups_pid_max_path);
     free(notify_on_release_path);
+    free(cgroup_path);
+    free(fs_path);
 }
 
 int child(void* args) {
@@ -171,28 +143,24 @@ int child(void* args) {
         exit(1);
     }
 
-    printf("%s\n%s %s\n", prog_path, *prog_args, *(prog_args+1));
-    printf("EXEC\n");
-
     if (execvp(prog_path, prog_args) != 0) {
-        fprintf(stderr, "System error: executing program failed - %s\n", strerror(errno));
+        fprintf(stderr, "System error: executing program failed\n");
         exit(1);
     }
 
+    return 0;
 }
 
 int main(int argc, char* argv[]) {
-    void* stack = malloc(STACK);
+    char* stack = (char *)malloc(STACK);
     if (stack == NULL){
         fprintf(stderr, "System error: allocating stack failed\n");
         exit(1);
     }
 
-    char** child_args = malloc((argc) * sizeof(char*));
+    char** child_args = (char **)malloc((argc) * sizeof(char*));
     memcpy(child_args, argv + 1, (argc - 1) * sizeof(char*));
     child_args[argc - 1] = NULL;
-
-    printf("before clone\n");
 
     if(clone(child, stack+STACK, CLONE_NEWPID | CLONE_NEWUTS | CLONE_NEWNS | SIGCHLD, child_args) == -1) {
         fprintf(stderr, "System error: cloning failed\n");
@@ -200,9 +168,7 @@ int main(int argc, char* argv[]) {
     }
     wait(NULL);
 
-    printf("after clone\n");
-
-    char* target = malloc((strlen(argv[2]) + 5) * sizeof(char));
+    char* target = (char *)malloc((strlen(argv[2]) + 5) * sizeof(char));
     strcpy(target, argv[2]);
     strcpy(target + strlen(argv[2]), "/proc");
     if(umount(target) != 0) {
@@ -214,4 +180,7 @@ int main(int argc, char* argv[]) {
 
     free(stack);
     free(child_args);
+    free(target);
+
+    return 0;
 }
